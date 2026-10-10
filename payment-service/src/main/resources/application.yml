@@ -1,0 +1,30 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: payment-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:13326/payment_db}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:admin}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+payment:
+  gateway:
+    reject-over: 1000000
+    approve-delay: ${PAYMENT_GATEWAY_APPROVE_DELAY:0s}
+  order-payment-cancellations:
+    cleanup:
+      interval: 10m
+      retention: 8d
+      batch-size: 1000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
