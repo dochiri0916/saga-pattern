@@ -1,0 +1,59 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: inventory-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:13316/inventory_db}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:admin}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092,localhost:39092,localhost:49092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        max.block.ms: 10000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+        transaction.timeout.ms: 15000
+
+inventory:
+  kafka:
+    topics:
+      stock-changed:
+        name: inventory.stock-changed
+        partitions: 3
+        replicas: 3
+  order-stock-records:
+    cleanup:
+      interval: 10m
+      retention: 8d
+      decreased-retention: ${INVENTORY_DECREASED_RETENTION:30d}
+      batch-size: 1000
+
+saga:
+  outbox:
+    enabled: true
+    shard-count: 16
+    relay:
+      concurrency: 4
+      poll-interval: 5s
+      batch-size: 100
+      lease-duration: 30s
+    cleanup:
+      interval: 10m
+      retention: 7d
+      batch-size: 1000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
