@@ -1,0 +1,17 @@
+**/*
+!order-service/
+!order-service/build/
+!order-service/build/libs/
+!order-service/build/libs/app.jar
+!inventory-service/
+!inventory-service/build/
+!inventory-service/build/libs/
+!inventory-service/build/libs/app.jar
+!payment-service/
+!payment-service/build/
+!payment-service/build/libs/
+!payment-service/build/libs/app.jar
+!shipping-service/
+!shipping-service/build/
+!shipping-service/build/libs/
+!shipping-service/build/libs/app.jar
