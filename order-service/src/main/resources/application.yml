@@ -1,0 +1,109 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:13306/order_db}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:admin}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092,localhost:39092,localhost:49092}
+    consumer:
+      group-id: order-service
+      auto-offset-reset: earliest
+      isolation-level: read_committed
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        max.block.ms: 10000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+        transaction.timeout.ms: 15000
+    listener:
+      ack-mode: record
+      concurrency: 1
+
+order:
+  kafka:
+    topics:
+      order-completed:
+        name: order.completed
+        partitions: 3
+        replicas: 3
+      stock-changed:
+        name: inventory.stock-changed
+  clients:
+    inventory:
+      base-urls: ${INVENTORY_BASE_URLS:http://localhost:18090,http://localhost:18091,http://localhost:18092}
+      connect-timeout: 1s
+      read-timeout: 3s
+      eject-duration: 5s
+    payment:
+      base-urls: ${PAYMENT_BASE_URLS:http://localhost:18100,http://localhost:18101,http://localhost:18102}
+      connect-timeout: 1s
+      read-timeout: 3s
+      eject-duration: 5s
+    shipping:
+      base-urls: ${SHIPPING_BASE_URLS:http://localhost:18110,http://localhost:18111,http://localhost:18112}
+      connect-timeout: 1s
+      read-timeout: 3s
+      eject-duration: 5s
+    circuit-breaker:
+      failure-rate-threshold: 50
+      sliding-window-size: 20
+      minimum-number-of-calls: 10
+      open-duration: 10s
+      half-open-calls: 3
+  cancel:
+    allowed-for: ${ORDER_CANCEL_ALLOWED_FOR:7d}
+  idempotency-keys:
+    cleanup:
+      interval: 10m
+      retention: 24h
+      batch-size: 1000
+  saga:
+    recovery:
+      after: 10s
+      scan-interval: 5s
+      batch-size: 100
+    stalled-after: 1m
+
+saga:
+  outbox:
+    enabled: true
+    shard-count: 16
+    relay:
+      concurrency: 4
+      poll-interval: 5s
+      batch-size: 100
+      lease-duration: 30s
+    cleanup:
+      interval: 10m
+      retention: 7d
+      batch-size: 1000
+  consumer:
+    enabled: true
+    retry:
+      initial-interval: 1s
+      max-interval: 10s
+    dead-letter:
+      name: order.dead-letters
+      partitions: 3
+      replicas: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,deadletters
