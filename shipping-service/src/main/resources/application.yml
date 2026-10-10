@@ -1,0 +1,59 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: shipping-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:13336/shipping_db}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:admin}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092,localhost:39092,localhost:49092}
+    consumer:
+      group-id: shipping-service
+      auto-offset-reset: earliest
+      isolation-level: read_committed
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    listener:
+      ack-mode: record
+      concurrency: 1
+
+shipping:
+  kafka:
+    topics:
+      order-completed:
+        name: order.completed
+
+saga:
+  consumer:
+    enabled: true
+    retry:
+      initial-interval: 1s
+      max-interval: 10s
+    dead-letter:
+      name: shipping.dead-letters
+      partitions: 3
+      replicas: 3
+  processed-events:
+    enabled: true
+    cleanup:
+      interval: 10m
+      retention: 8d
+      batch-size: 1000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,deadletters
