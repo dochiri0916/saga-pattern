@@ -1,13 +1,13 @@
-package com.example.saga.shipping.domain
+package com.example.saga.shipping.domain.shipment
 
-import com.example.saga.shipping.domain.exception.InvalidShipmentStatusTransitionException
-import com.example.saga.shipping.domain.vo.OrderId
-import com.example.saga.shipping.domain.vo.ShipmentId
-import com.example.saga.shipping.domain.vo.ShipmentStatus
+import com.example.saga.shipping.domain.shipment.exception.InvalidShipmentStatusTransitionException
+import com.example.saga.shipping.domain.shipment.vo.OrderReferenceId
+import com.example.saga.shipping.domain.shipment.vo.ShipmentId
+import com.example.saga.shipping.domain.shipment.vo.ShipmentStatus
 
 class Shipment private constructor(
     val id: ShipmentId,
-    val orderId: OrderId,
+    val orderId: OrderReferenceId,
     val status: ShipmentStatus,
 ) {
 
@@ -31,10 +31,10 @@ class Shipment private constructor(
     override fun toString(): String = "Shipment(id=$id, orderId=$orderId, status=$status)"
 
     companion object {
-        fun register(id: ShipmentId, orderId: OrderId): Shipment = Shipment(id, orderId, ShipmentStatus.REGISTERED)
+        fun register(id: ShipmentId, orderId: OrderReferenceId): Shipment = Shipment(id, orderId, ShipmentStatus.REGISTERED)
 
-        fun registerCancelled(id: ShipmentId, orderId: OrderId): Shipment = Shipment(id, orderId, ShipmentStatus.CANCELLED)
+        fun registerCancelled(id: ShipmentId, orderId: OrderReferenceId): Shipment = Shipment(id, orderId, ShipmentStatus.CANCELLED)
 
-        fun restore(id: ShipmentId, orderId: OrderId, status: ShipmentStatus): Shipment = Shipment(id, orderId, status)
+        fun restore(id: ShipmentId, orderId: OrderReferenceId, status: ShipmentStatus): Shipment = Shipment(id, orderId, status)
     }
 }

@@ -1,14 +1,15 @@
 package com.example.saga.shipping.adapter.out.persistence
 
+import com.example.saga.shipping.adapter.out.persistence.entity.ShipmentEntity
+import com.example.saga.shipping.adapter.out.persistence.mapper.toDomain
+import com.example.saga.shipping.adapter.out.persistence.repository.ShipmentJpaRepository
 import com.example.saga.shipping.application.port.out.ShipmentRepository
-import com.example.saga.shipping.domain.Shipment
-import com.example.saga.shipping.domain.vo.OrderId
-import com.example.saga.shipping.domain.vo.ShipmentId
-import com.example.saga.shipping.domain.vo.ShipmentStatus
+import com.example.saga.shipping.domain.shipment.Shipment
+import com.example.saga.shipping.domain.shipment.vo.OrderReferenceId
 import org.springframework.stereotype.Repository
 
 @Repository
-class ShipmentPersistenceAdapter(
+class ShipmentRepositoryAdapter(
     private val shipmentJpaRepository: ShipmentJpaRepository,
 ) : ShipmentRepository {
 
@@ -31,12 +32,10 @@ class ShipmentPersistenceAdapter(
         }.toDomain()
     }
 
-    override fun findByOrderId(orderId: OrderId): Shipment? =
+    override fun findByOrderId(orderId: OrderReferenceId): Shipment? =
         shipmentJpaRepository.findByOrderId(orderId.value)?.toDomain()
 
-    override fun findByOrderIdForUpdate(orderId: OrderId): Shipment? =
+    override fun findByOrderIdForUpdate(orderId: OrderReferenceId): Shipment? =
         shipmentJpaRepository.findForUpdateByOrderId(orderId.value)?.toDomain()
 
-    private fun ShipmentEntity.toDomain(): Shipment =
-        Shipment.restore(ShipmentId.of(publicId), OrderId.of(orderId), ShipmentStatus.valueOf(status))
 }

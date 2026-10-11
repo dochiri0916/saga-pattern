@@ -1,8 +1,9 @@
 package com.example.saga.shipping.adapter.`in`.web
 
-import com.example.saga.shipping.domain.exception.InvalidShipmentStatusTransitionException
-import com.example.saga.shipping.domain.exception.ShipmentDomainException
-import com.example.saga.platform.web.ProblemDetailFactory
+import com.example.saga.infrastructure.web.ProblemDetailFactory
+import com.example.saga.shipping.adapter.`in`.web.controller.OrderShipmentController
+import com.example.saga.shipping.domain.shipment.exception.InvalidShipmentStatusTransitionException
+import com.example.saga.shipping.domain.shipment.exception.ShipmentDomainException
 import org.slf4j.LoggerFactory
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order

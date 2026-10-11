@@ -45,7 +45,7 @@ saga:
       name: shipping.dead-letters
       partitions: 3
       replicas: 3
-  processed-events:
+  inbox:
     enabled: true
     cleanup:
       interval: 10m

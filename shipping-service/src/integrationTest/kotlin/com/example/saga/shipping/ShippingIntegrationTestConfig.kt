@@ -10,6 +10,7 @@ import org.springframework.context.annotation.ComponentScan
     basePackages = [
         "com.example.saga.shipping.application.service",
         "com.example.saga.shipping.adapter.out.persistence",
+        "com.example.saga.shipping.adapter.out.audit",
         "com.example.saga.shipping.adapter.out.identifier",
     ]
 )

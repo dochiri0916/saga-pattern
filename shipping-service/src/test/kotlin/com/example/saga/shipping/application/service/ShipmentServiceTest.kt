@@ -1,20 +1,18 @@
 package com.example.saga.shipping.application.service
 
 import com.example.saga.shipping.adapter.out.identifier.UuidV7ShipmentIdGenerator
+import com.example.saga.shipping.application.command.CancelOrderShipmentCommand
+import com.example.saga.shipping.application.command.RegisterShipmentCommand
+import com.example.saga.shipping.application.command.ShipOrderShipmentCommand
 import com.example.saga.shipping.application.exception.ShipmentCancelRejectedException
 import com.example.saga.shipping.application.exception.ShipmentCancelRejectionReason
 import com.example.saga.shipping.application.exception.ShipmentNotFoundException
-import com.example.saga.shipping.application.port.`in`.command.CancelOrderShipmentCommand
-import com.example.saga.shipping.application.port.`in`.command.RegisterShipmentCommand
-import com.example.saga.shipping.application.port.`in`.command.ShipOrderShipmentCommand
-import com.example.saga.shipping.application.port.out.ProcessedEventRepository
 import com.example.saga.shipping.application.port.out.ShipmentRepository
-import com.example.saga.shipping.domain.Shipment
-import com.example.saga.shipping.domain.exception.InvalidShipmentStatusTransitionException
-import com.example.saga.shipping.domain.vo.OrderId
-import com.example.saga.shipping.domain.vo.ShipmentStatus
+import com.example.saga.shipping.domain.shipment.Shipment
+import com.example.saga.shipping.domain.shipment.exception.InvalidShipmentStatusTransitionException
+import com.example.saga.shipping.domain.shipment.vo.OrderReferenceId
+import com.example.saga.shipping.domain.shipment.vo.ShipmentStatus
 import com.github.f4b6a3.uuid.UuidCreator
-import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -23,13 +21,13 @@ class ShipmentServiceTest {
 
     private val shipments = InMemoryShipmentRepository()
     private val idGenerator = UuidV7ShipmentIdGenerator()
-    private val registerService = RegisterShipmentService(InMemoryProcessedEventRepository(), idGenerator, shipments)
-    private val cancelService = CancelOrderShipmentService(idGenerator, shipments)
-    private val shipService = ShipOrderShipmentService(shipments)
+    private val registerService = RegisterShipmentService(idGenerator, shipments, RecordingAuditTrail())
+    private val cancelService = CancelOrderShipmentService(idGenerator, shipments, RecordingAuditTrail())
+    private val shipService = ShipOrderShipmentService(shipments, RecordingAuditTrail())
 
-    private val orderId = OrderId.of(UuidCreator.getTimeOrderedEpoch())
+    private val orderId = OrderReferenceId.of(UuidCreator.getTimeOrderedEpoch())
 
-    private fun register(eventId: UUID = UUID.randomUUID()) = registerService.register(RegisterShipmentCommand(eventId, orderId.value))
+    private fun register() = registerService.register(RegisterShipmentCommand(orderId.value))
 
     private fun cancel() = cancelService.cancel(CancelOrderShipmentCommand(orderId.value))
 
@@ -45,10 +43,9 @@ class ShipmentServiceTest {
     }
 
     @Test
-    fun `같은 이벤트가 다시 오거나 같은 주문의 이벤트가 다른 ID로 와도 배송은 하나다`() {
-        val eventId = UUID.randomUUID()
-        register(eventId)
-        register(eventId)
+    fun `같은 주문의 배송 등록을 여러 번 요청해도 배송은 하나다`() {
+        register()
+        register()
         register()
 
         assertEquals(1, shipments.count())
@@ -96,7 +93,7 @@ class ShipmentServiceTest {
 }
 
 private class InMemoryShipmentRepository : ShipmentRepository {
-    private val shipments = LinkedHashMap<OrderId, Shipment>()
+    private val shipments = LinkedHashMap<OrderReferenceId, Shipment>()
 
     fun count(): Int = shipments.size
 
@@ -113,12 +110,6 @@ private class InMemoryShipmentRepository : ShipmentRepository {
         return shipments.getValue(shipment.orderId)
     }
 
-    override fun findByOrderId(orderId: OrderId): Shipment? = shipments[orderId]
-    override fun findByOrderIdForUpdate(orderId: OrderId): Shipment? = shipments[orderId]
-}
-
-private class InMemoryProcessedEventRepository : ProcessedEventRepository {
-    private val processed = HashSet<UUID>()
-
-    override fun saveIfAbsent(eventId: UUID): Boolean = processed.add(eventId)
+    override fun findByOrderId(orderId: OrderReferenceId): Shipment? = shipments[orderId]
+    override fun findByOrderIdForUpdate(orderId: OrderReferenceId): Shipment? = shipments[orderId]
 }

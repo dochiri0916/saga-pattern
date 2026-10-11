@@ -1,22 +1,22 @@
 package com.example.saga.shipping
 
+import com.example.saga.shipping.application.command.CancelOrderShipmentCommand
+import com.example.saga.shipping.application.command.RegisterShipmentCommand
+import com.example.saga.shipping.application.command.ShipOrderShipmentCommand
 import com.example.saga.shipping.application.exception.ShipmentCancelRejectedException
-import com.example.saga.shipping.application.port.`in`.command.CancelOrderShipmentCommand
-import com.example.saga.shipping.application.port.`in`.command.RegisterShipmentCommand
-import com.example.saga.shipping.application.port.`in`.command.ShipOrderShipmentCommand
-import com.example.saga.shipping.application.port.`in`.usecase.CancelOrderShipmentUseCase
-import com.example.saga.shipping.application.port.`in`.usecase.RegisterShipmentUseCase
-import com.example.saga.shipping.application.port.`in`.usecase.ShipOrderShipmentUseCase
+import com.example.saga.shipping.application.port.`in`.CancelOrderShipmentUseCase
+import com.example.saga.shipping.application.port.`in`.RegisterShipmentUseCase
+import com.example.saga.shipping.application.port.`in`.ShipOrderShipmentUseCase
 import com.example.saga.shipping.application.port.out.ShipmentRepository
-import com.example.saga.shipping.domain.vo.OrderId
-import com.example.saga.shipping.domain.vo.ShipmentStatus
+import com.example.saga.shipping.domain.shipment.vo.OrderReferenceId
+import com.example.saga.shipping.domain.shipment.vo.ShipmentStatus
 import com.github.f4b6a3.uuid.UuidCreator
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
 
 @SpringBootTest(classes = [ShippingIntegrationTestConfig::class], properties = [MYSQL_URL, CREATE_TABLES, POOL_SIZE, NO_OUTBOX, NO_CONSUMER])
 class ShipmentLockingIntegrationTest @Autowired constructor(
@@ -24,18 +24,19 @@ class ShipmentLockingIntegrationTest @Autowired constructor(
     private val shipOrderShipmentUseCase: ShipOrderShipmentUseCase,
     private val cancelOrderShipmentUseCase: CancelOrderShipmentUseCase,
     private val shipmentRepository: ShipmentRepository,
+    private val inboxGuard: com.example.saga.infrastructure.messaging.inbox.InboxGuard,
 ) {
 
     private fun newId(): UUID = UuidCreator.getTimeOrderedEpoch()
 
-    private fun status(orderId: UUID): ShipmentStatus? = shipmentRepository.findByOrderId(OrderId.of(orderId))?.status
+    private fun status(orderId: UUID): ShipmentStatus? = shipmentRepository.findByOrderId(OrderReferenceId.of(orderId))?.status
 
     @Test
     fun `출고와 취소가 동시에 와도 둘 중 하나만 받아들여진다`() {
         var shipped = 0
         repeat(40) {
             val orderId = newId()
-            registerShipmentUseCase.register(RegisterShipmentCommand(newId(), orderId))
+            registerShipmentUseCase.register(RegisterShipmentCommand(orderId))
 
             val (ship, cancel) = race(
                 { shipOrderShipmentUseCase.ship(ShipOrderShipmentCommand(orderId)) },
@@ -60,7 +61,7 @@ class ShipmentLockingIntegrationTest @Autowired constructor(
             val orderId = newId()
 
             val results = race(
-                { registerShipmentUseCase.register(RegisterShipmentCommand(newId(), orderId)) },
+                { registerShipmentUseCase.register(RegisterShipmentCommand(orderId)) },
                 { cancelOrderShipmentUseCase.cancel(CancelOrderShipmentCommand(orderId)) },
             )
 
@@ -71,7 +72,7 @@ class ShipmentLockingIntegrationTest @Autowired constructor(
 
     @Test
     fun `같은 주문의 취소가 동시에 여러 번 와도 교착 없이 모두 성공한다`() {
-        val registered = newId().also { registerShipmentUseCase.register(RegisterShipmentCommand(newId(), it)) }
+        val registered = newId().also { registerShipmentUseCase.register(RegisterShipmentCommand(it)) }
         val absent = newId()
 
         listOf(registered, absent).forEach { orderId ->
@@ -88,7 +89,7 @@ class ShipmentLockingIntegrationTest @Autowired constructor(
             val orderId = newId()
 
             val results = race(
-                { registerShipmentUseCase.register(RegisterShipmentCommand(newId(), orderId)) },
+                { registerShipmentUseCase.register(RegisterShipmentCommand(orderId)) },
                 { cancelOrderShipmentUseCase.cancel(CancelOrderShipmentCommand(orderId)) },
                 { cancelOrderShipmentUseCase.cancel(CancelOrderShipmentCommand(orderId)) },
                 { cancelOrderShipmentUseCase.cancel(CancelOrderShipmentCommand(orderId)) },
@@ -104,7 +105,7 @@ class ShipmentLockingIntegrationTest @Autowired constructor(
         val orderId = newId()
         val eventId = newId()
 
-        val results = race(*Array(8) { { registerShipmentUseCase.register(RegisterShipmentCommand(eventId, orderId)) } })
+        val results = race(*Array(8) { { inboxGuard.execute(eventId) { registerShipmentUseCase.register(RegisterShipmentCommand(orderId)) } } })
 
         results.forEach { it.getOrThrow() }
         assertEquals(ShipmentStatus.REGISTERED, status(orderId))

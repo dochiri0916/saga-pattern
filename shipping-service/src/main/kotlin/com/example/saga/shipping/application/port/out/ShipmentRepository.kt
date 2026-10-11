@@ -1,7 +1,7 @@
 package com.example.saga.shipping.application.port.out
 
-import com.example.saga.shipping.domain.Shipment
-import com.example.saga.shipping.domain.vo.OrderId
+import com.example.saga.shipping.domain.shipment.Shipment
+import com.example.saga.shipping.domain.shipment.vo.OrderReferenceId
 
 interface ShipmentRepository {
     fun save(shipment: Shipment): Shipment
@@ -10,7 +10,7 @@ interface ShipmentRepository {
 
     fun saveIfAbsentAndLock(shipment: Shipment): Shipment
 
-    fun findByOrderId(orderId: OrderId): Shipment?
+    fun findByOrderId(orderId: OrderReferenceId): Shipment?
 
-    fun findByOrderIdForUpdate(orderId: OrderId): Shipment?
+    fun findByOrderIdForUpdate(orderId: OrderReferenceId): Shipment?
 }

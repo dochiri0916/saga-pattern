@@ -1,17 +1,17 @@
-package com.example.saga.shipping.adapter.`in`.web
+package com.example.saga.shipping.adapter.`in`.web.controller
 
 import com.example.saga.shipping.adapter.`in`.requireV7
-import com.example.saga.shipping.application.port.`in`.command.CancelOrderShipmentCommand
-import com.example.saga.shipping.application.port.`in`.command.ShipOrderShipmentCommand
-import com.example.saga.shipping.application.port.`in`.usecase.CancelOrderShipmentUseCase
-import com.example.saga.shipping.application.port.`in`.usecase.ShipOrderShipmentUseCase
+import com.example.saga.shipping.application.command.CancelOrderShipmentCommand
+import com.example.saga.shipping.application.command.ShipOrderShipmentCommand
+import com.example.saga.shipping.application.port.`in`.CancelOrderShipmentUseCase
+import com.example.saga.shipping.application.port.`in`.ShipOrderShipmentUseCase
+import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
 
 @RestController
 @RequestMapping("/order-shipments/{orderId}")

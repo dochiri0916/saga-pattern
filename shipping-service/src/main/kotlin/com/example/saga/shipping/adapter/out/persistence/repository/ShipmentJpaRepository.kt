@@ -1,11 +1,12 @@
-package com.example.saga.shipping.adapter.out.persistence
+package com.example.saga.shipping.adapter.out.persistence.repository
 
+import com.example.saga.shipping.adapter.out.persistence.entity.ShipmentEntity
 import jakarta.persistence.LockModeType
+import java.util.UUID
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
-import java.util.UUID
 
 interface ShipmentJpaRepository : JpaRepository<ShipmentEntity, Long> {
 

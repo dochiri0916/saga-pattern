@@ -1,4 +1,4 @@
-package com.example.saga.shipping.application.port.`in`.command
+package com.example.saga.shipping.application.command
 
 import java.util.UUID
 

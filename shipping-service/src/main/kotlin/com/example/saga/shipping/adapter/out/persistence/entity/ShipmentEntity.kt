@@ -1,4 +1,4 @@
-package com.example.saga.shipping.adapter.out.persistence
+package com.example.saga.shipping.adapter.out.persistence.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

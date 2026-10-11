@@ -1,4 +1,4 @@
-package com.example.saga.shipping.domain.vo
+package com.example.saga.shipping.domain.shipment.vo
 
 import java.util.UUID
 
