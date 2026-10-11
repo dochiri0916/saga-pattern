@@ -8,7 +8,8 @@
 
 ```text
 saga-pattern/
-├── platform/            # 공통 기술 지원 (웹 오류 응답, 트랜잭셔널 아웃박스, 컨슈머 오류 처리, 중복 처리 방지)
+├── infrastructure/      # 공통 기술 지원 (Outbox, Inbox, HTTP 멱등성, 감사 기록, Kafka, 웹 오류 응답)
+├── *-contract/          # 각 BC의 공개 이벤트·명령 계약 (프레임워크 의존 없는 Kotlin JAR)
 ├── order-service/       # 주문 서비스 (사가 오케스트레이터)
 ├── inventory-service/   # 재고 서비스
 ├── payment-service/     # 결제 서비스
@@ -20,7 +21,39 @@ saga-pattern/
 └── compose.yml          # 서비스별 3개 인스턴스 + 서비스별 MySQL 1개 + Kafka 3개 노드 + 로드 밸런서
 ```
 
-각 서비스는 헥사고날 구조입니다. `domain`, `application`(`port/in`, `port/out`, `service`, `saga`), `adapter`(`in/web`, `in/messaging`, `in/scheduling`, `out/persistence`, `out/client`, `out/messaging`)로 나뉩니다.
+각 서비스는 `com.example.saga.{feature}` 아래에 `domain`, `application`, `adapter`를 두며, 같은 패키지의 `contract`는 별도 `*-contract` 모듈로 빌드합니다. 다른 BC의 코드는 `contract`만 import할 수 있고, `infrastructure`는 feature에 의존하지 않습니다.
+
+```text
+{feature}/
+├── contract/{event,command}              # 공개 계약, 별도 모듈
+├── domain/{aggregate}                   # Root, Entity, VO, Domain Event, Policy, Exception
+├── application/
+│   ├── port/{in,out}                    # Use Case, Repository, Gateway, EventPublicationPort, AuditTrail
+│   ├── {command,query,result,exception,service}
+│   ├── integration/mapper               # Domain Event → 공개 계약
+│   └── saga/{orchestrator,model}         # 주문 Saga의 실행과 상태
+└── adapter/
+    ├── in/web/{controller,request,response,mapper}
+    ├── in/messaging/{consumer,mapper}    # 타 BC 계약 → 자체 Command
+    ├── in/scheduler
+    ├── out/persistence/{entity,repository,mapper}
+    ├── out/{messaging,audit}
+    └── out/client/{http,mapper}
+```
+
+주문 Aggregate의 Root, Entity, 컬렉션, 변경 결과는 `domain/order`에 두고, Exception, Domain Event, VO, Policy는 각각 `exception`, `event`, `vo`, `policy` 하위 패키지로 나눕니다.
+
+Aggregate, Saga, 조회 모델의 Repository는 모두 application의 output port에 둡니다. 취소 기한과 보상 순서는 `domain/order/policy`의 Policy가 결정합니다. 이벤트 발행 어댑터는 공개 계약을 직렬화해 `OutboxWriter`에 전달하고, 릴레이의 재시도 간격은 `OutboxRetryPolicy`가 관리합니다.
+
+메시지 소비자는 `InboxGuard`로 Use Case를 감싸므로 중복 검사·Inbox 기록·업무 변경·감사 기록을 한 트랜잭션으로 처리합니다. 실패하면 모두 롤백되어 재전달할 수 있습니다. envelope 해석은 공통 인프라가, payload 변환과 검증은 해당 feature의 mapper가 담당합니다. Inbox는 기존 배송의 `processed_events` 테이블을 그대로 사용하며, 주문에서도 같은 방식으로 재고 이벤트 중복을 막습니다.
+
+HTTP `Idempotency-Key`는 웹 어댑터에서만 `IdempotencyInterceptor`를 통해 처리합니다. `IdempotencyManager`는 요청 키와 주문·Saga 준비를 한 트랜잭션으로 저장합니다. 트랜잭션을 커밋한 뒤 주문을 진행하므로 참여 서비스의 HTTP 호출 중에는 DB 잠금을 잡지 않습니다. 업무 감사 기록은 각 feature의 `AuditTrail`과 어댑터를 거쳐 `AuditRecorder`가 같은 업무 트랜잭션에 저장합니다. 공통 `JpaConfig`가 활성 기능의 JPA 패키지를 등록하고, `TransactionConfig`가 릴레이에서 사용하는 `TransactionTemplate`을 구성하며, `JacksonConfig`가 serializer와 envelope deserializer를 제공합니다.
+
+기존 DB는 새 코드 실행 전에 스키마 변경이 필요합니다. 다음 SQL은 수동 적용용이며 자동 실행되지 않습니다. 새 DB를 Hibernate로 생성한 경우 기존 멱등 키 복사는 필요하지 않습니다.
+
+1. 네 서비스 DB에 `infrastructure/src/main/resources/db/refactoring/01_audit_trail.sql`을 적용합니다.
+2. 주문 DB에 `order-service/src/main/resources/db/refactoring/02_order_infrastructure.sql`을 적용합니다.
+3. 기존 주문 DB의 `order_idempotency_keys`가 있다면 `03_migrate_order_idempotency.sql`을 적용합니다. 키·요청 해시·주문 ID·생성 시각을 보존하며 기존 테이블은 유지합니다.
 
 ## 흐름
 
@@ -128,9 +161,9 @@ curl -X POST localhost:18110/order-shipments/<orderId>/ship
 
 단위 테스트는 스프링 컨텍스트 없이 도메인과 애플리케이션 서비스를 직접 만들어 검증합니다. 포트는 메모리 구현으로 대신합니다. 사가 상태 전이, 참여 서비스 응답(성공·거절·결과 불명·보내지 못함)별 진행, 멱등 키, 취소 기한, 결제의 승인 대기 중 취소, 주문 단위 차감·복원·배송의 중복 처리를 다룹니다.
 
-통합 테스트(`src/integrationTest`)는 Testcontainers로 MySQL 8.4를 띄우고 애플리케이션 서비스와 영속성 어댑터만 올려, 여러 스레드를 같은 순간에 출발시켜 잠금과 경합을 검증합니다. 같은 사가의 동시 전이, 복구 작업의 선점, 같은 멱등 키의 동시 요청, 결제 대 취소, 차감 대 복원, 출고 대 취소, 같은 요청이 여럿 겹칠 때의 교착 여부를 다룹니다. 테이블은 엔티티로 만들고(`ddl-auto: create`), Kafka와 참여 서비스 호출은 포함하지 않습니다. `./gradlew build`에는 포함되지 않습니다.
+통합 테스트(`src/integrationTest`)는 Testcontainers로 MySQL 8.4를 띄우고 애플리케이션 서비스·필요한 어댑터·공통 인프라를 올려, 여러 스레드를 같은 순간에 출발시켜 잠금과 경합을 검증합니다. 같은 사가의 동시 전이, 복구 작업의 선점, 같은 멱등 키의 동시 요청, 결제 대 취소, 차감 대 복원, 출고 대 취소, 같은 요청이 여럿 겹칠 때의 교착 여부를 다룹니다. Inbox·감사 기록·HTTP 멱등 키의 롤백과 중복 처리, 기존 멱등 기록의 스키마 이전도 검증합니다. 업무 테스트의 테이블은 엔티티로 만들고(`ddl-auto: create`), Kafka와 참여 서비스 호출은 포함하지 않습니다. `./gradlew build`에는 포함되지 않습니다.
 
-아키텍처 규칙(`architecture-test`)은 컴파일된 클래스의 의존을 읽어 네 서비스에 같은 규칙을 적용합니다. 의존은 `adapter → application → domain` 한 방향으로만 흐르고 `config`만 전체를 조립합니다. domain은 자기 자신과 언어 표준만 보고, application이 쓰는 프레임워크는 `@Service`와 `@Transactional`뿐이며, 인바운드와 아웃바운드 어댑터는 서로를 보지 않고 유스케이스 구현 대신 포트를 봅니다. JPA·Kafka·웹 같은 기술은 정해진 어댑터 패키지 밖으로 나가지 않고, 서비스는 다른 서비스의 코드를 보지 않습니다.
+아키텍처 규칙(`architecture-test`)은 컴파일된 클래스의 의존을 읽어 네 서비스에 같은 규칙을 적용합니다. 의존은 `adapter → application → domain`으로 흐릅니다. domain은 자기 자신과 언어 표준만 보고, application이 쓰는 프레임워크는 `@Service`와 `@Transactional`뿐입니다. 어댑터는 유스케이스 구현 대신 포트를 보며, JPA·Kafka·웹은 정해진 기술 어댑터 안에 둡니다. Aggregate Repository의 위치, application의 Inbox·HTTP 멱등성 의존 금지, BC 간 공개 계약 경계, 계약의 기술 의존 금지, infrastructure의 feature 의존 금지를 검사합니다.
 
 실제 장애(인스턴스 종료, 느린 응답)는 compose 환경에서 따로 확인합니다.
 
