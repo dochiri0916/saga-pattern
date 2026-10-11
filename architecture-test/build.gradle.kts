@@ -1,4 +1,5 @@
-val serviceClasses = listOf("order-service", "inventory-service", "payment-service", "shipping-service")
+val serviceClasses = listOf("order-service", "inventory-service", "payment-service", "shipping-service", "infrastructure",
+    "order-contract", "inventory-contract", "payment-contract", "shipping-contract")
     .map { rootProject.project(":$it").extensions.getByType<SourceSetContainer>()["main"].output }
 
 dependencies {

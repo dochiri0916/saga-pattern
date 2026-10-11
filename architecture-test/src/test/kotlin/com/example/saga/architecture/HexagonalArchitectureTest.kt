@@ -5,16 +5,37 @@ import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.domain.JavaClasses
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.lang.ArchRule
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
+import kotlin.test.assertTrue
 import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.DynamicTest.dynamicTest
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
-import kotlin.test.assertTrue
 
 class HexagonalArchitectureTest {
 
     private val services = listOf("order", "inventory", "payment", "shipping")
     private val imported = services.associateWith { ClassFileImporter().importPackages(basePackage(it)) }
+
+    @Test
+    fun `infrastructure는 feature에 의존하지 않는다`() {
+        val classes = ClassFileImporter().importPackages(PLATFORM)
+        assertTrue(classes.isNotEmpty())
+        noClasses().should().dependOnClassesThat()
+            .resideInAnyPackage(*services.map { "${basePackage(it)}.." }.toTypedArray()).check(classes)
+    }
+
+    @Test
+    fun `공개 계약은 기술과 내부 레이어를 참조하지 않는다`() {
+        services.forEach { service ->
+            val classes = ClassFileImporter().importPackages("${basePackage(service)}.contract")
+            assertTrue(classes.isNotEmpty(), "$service 공개 계약이 없다")
+            noClasses().should().dependOnClassesThat().resideOutsideOfPackages(
+                "${basePackage(service)}.contract..", "java..", "kotlin..", "org.jetbrains.annotations..",
+            ).check(classes)
+        }
+    }
 
     @TestFactory
     fun `서비스는 헥사고날 규칙을 지킨다`(): List<DynamicTest> = services.flatMap { service ->
@@ -25,7 +46,13 @@ class HexagonalArchitectureTest {
 
     private fun rules(service: String): List<ArchRule> {
         val base = basePackage(service)
-        val otherServices = (services - service).map { "${basePackage(it)}.." }.toTypedArray()
+        val privateTypesOfOtherServices = object : DescribedPredicate<JavaClass>("다른 BC의 contract 밖 타입") {
+            override fun test(type: JavaClass): Boolean = (services - service).any {
+                val otherBase = basePackage(it)
+                (type.packageName == otherBase || type.packageName.startsWith("$otherBase.")) &&
+                    type.packageName != "$otherBase.contract" && !type.packageName.startsWith("$otherBase.contract.")
+            }
+        }
 
         val layerRules = listOf(
             noClasses().that().resideInAPackage("$base.domain..")
@@ -33,7 +60,7 @@ class HexagonalArchitectureTest {
                 .resideOutsideOfPackages("$base.domain..", "java..", "kotlin..", "org.jetbrains.annotations..")
                 .because("domain은 자기 자신과 언어 표준만 본다"),
             noClasses().that().resideInAPackage("$base.application..")
-                .should().dependOnClassesThat().resideInAnyPackage("$base.adapter..", "$base.config..")
+                .should().dependOnClassesThat().resideInAPackage("$base.adapter..")
                 .because("application은 어댑터와 조립 코드를 보지 않는다"),
             noClasses().that().resideInAPackage("$base.application..")
                 .should().dependOnClassesThat(forbiddenInApplication)
@@ -45,14 +72,29 @@ class HexagonalArchitectureTest {
                 .should().dependOnClassesThat().resideInAPackage("$base.adapter.in..")
                 .because("아웃바운드 어댑터는 인바운드 어댑터를 보지 않는다"),
             noClasses().that().resideInAPackage("$base.adapter..")
-                .should().dependOnClassesThat().resideInAPackage("$base.application.service..")
+                .should().dependOnClassesThat().resideInAnyPackage("$base.application.service..", "$base.application.saga.orchestrator..")
                 .because("어댑터는 유스케이스 구현이 아니라 포트를 본다"),
-            noClasses().that().resideOutsideOfPackages("$base.adapter..", "$base.config..")
+            noClasses().that().resideOutsideOfPackage("$base.adapter..")
                 .should().dependOnClassesThat().resideInAPackage("$PLATFORM..")
-                .because("platform(공통 기술)을 쓰는 것은 어댑터와 조립 코드뿐이다"),
+                .because("infrastructure를 쓰는 것은 어댑터뿐이다"),
             noClasses()
-                .should().dependOnClassesThat().resideInAnyPackage(*otherServices)
-                .because("서비스는 다른 서비스의 코드를 보지 않는다"),
+                .should().dependOnClassesThat(privateTypesOfOtherServices)
+                .because("다른 BC에서는 contract만 import한다"),
+            classes().that().haveNameMatching(".*\\.(Order|Stock|Payment|Shipment|OrderStockRecord|OrderPaymentCancellation)Repository")
+                .should().resideInAPackage("$base.application.port.out..")
+                .because("Aggregate Repository는 application의 output port에 둔다"),
+            noClasses().that().resideInAPackage("$base.application..")
+                .should().dependOnClassesThat().haveNameMatching(".*\\.(Inbox.*|ProcessedEvent.*|Idempotency.*)")
+                .because("Inbox와 HTTP 멱등성은 infrastructure와 인바운드 어댑터에서 처리한다"),
+            noClasses().that().resideInAPackage("$base.application..")
+                .should().haveSimpleNameEndingWith("Policy")
+                .because("보상 정책은 domain에 둔다"),
+            noClasses().that().resideOutsideOfPackage("$base.adapter.in.web..")
+                .should().dependOnClassesThat().resideInAPackage("$PLATFORM.idempotency..")
+                .because("HTTP 멱등성은 웹 인바운드 어댑터에만 적용한다"),
+            noClasses().that().resideInAnyPackage("$base.adapter.in.web.request..", "$base.adapter.in.web.response..")
+                .should().dependOnClassesThat().resideInAnyPackage("$base.application..", "$base.domain..")
+                .because("웹 DTO 변환은 mapper가 담당한다"),
         )
 
         val containmentRules = technologyHomes.map { (technology, homes) ->
@@ -76,7 +118,7 @@ class HexagonalArchitectureTest {
     private data class Technology(val name: String, val packages: List<String>)
 
     companion object {
-        private const val PLATFORM = "com.example.saga.platform"
+        private const val PLATFORM = "com.example.saga.infrastructure"
 
         private val technologyHomes = mapOf(
             Technology("JPA", listOf("jakarta.persistence..", "org.hibernate..", "org.springframework.data.."))
