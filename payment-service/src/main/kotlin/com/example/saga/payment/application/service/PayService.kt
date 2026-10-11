@@ -1,15 +1,15 @@
 package com.example.saga.payment.application.service
 
+import com.example.saga.payment.application.command.PayCommand
 import com.example.saga.payment.application.exception.PaymentRejectedException
 import com.example.saga.payment.application.exception.PaymentRejectionReason
-import com.example.saga.payment.application.port.`in`.command.PayCommand
-import com.example.saga.payment.application.port.`in`.result.PayResult
-import com.example.saga.payment.application.port.`in`.usecase.PayUseCase
+import com.example.saga.payment.application.port.`in`.PayUseCase
 import com.example.saga.payment.application.port.out.PaymentGateway
-import com.example.saga.payment.domain.exception.InvalidPaymentAmountException
-import com.example.saga.payment.domain.vo.OrderId
-import com.example.saga.payment.domain.vo.PaymentAmount
-import com.example.saga.payment.domain.vo.PaymentStatus
+import com.example.saga.payment.application.result.PayResult
+import com.example.saga.payment.domain.payment.exception.InvalidPaymentAmountException
+import com.example.saga.payment.domain.payment.vo.OrderReferenceId
+import com.example.saga.payment.domain.payment.vo.PaymentAmount
+import com.example.saga.payment.domain.payment.vo.PaymentStatus
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -22,7 +22,7 @@ class PayService(
 ) : PayUseCase {
 
     override fun pay(command: PayCommand): PayResult {
-        val orderId = OrderId.of(command.orderId)
+        val orderId = OrderReferenceId.of(command.orderId)
         val amount = try {
             PaymentAmount.of(Math.toIntExact(command.amount))
         } catch (e: ArithmeticException) {
@@ -49,7 +49,7 @@ class PayService(
         }
     }
 
-    private fun rejected(orderId: OrderId, reason: PaymentRejectionReason): PaymentRejectedException {
+    private fun rejected(orderId: OrderReferenceId, reason: PaymentRejectionReason): PaymentRejectedException {
         log.info("주문의 결제를 거절했습니다. orderId={}, reason={}", orderId, reason)
         return PaymentRejectedException(orderId.toString(), reason)
     }

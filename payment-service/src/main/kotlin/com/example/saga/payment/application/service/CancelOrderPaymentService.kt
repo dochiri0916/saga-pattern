@@ -1,9 +1,9 @@
 package com.example.saga.payment.application.service
 
-import com.example.saga.payment.application.port.`in`.command.CancelOrderPaymentCommand
-import com.example.saga.payment.application.port.`in`.usecase.CancelOrderPaymentUseCase
+import com.example.saga.payment.application.command.CancelOrderPaymentCommand
+import com.example.saga.payment.application.port.`in`.CancelOrderPaymentUseCase
 import com.example.saga.payment.application.port.out.PaymentGateway
-import com.example.saga.payment.domain.vo.OrderId
+import com.example.saga.payment.domain.payment.vo.OrderReferenceId
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
@@ -16,7 +16,7 @@ class CancelOrderPaymentService(
 ) : CancelOrderPaymentUseCase {
 
     override fun cancel(command: CancelOrderPaymentCommand) {
-        val orderId = OrderId.of(command.orderId)
+        val orderId = OrderReferenceId.of(command.orderId)
         val payment = paymentStepExecutor.cancel(orderId)
         if (payment == null) {
             log.info("취소할 결제가 없습니다. orderId={}", orderId)

@@ -4,14 +4,15 @@ import com.example.saga.payment.application.exception.PaymentAlreadyExistsExcept
 import com.example.saga.payment.application.exception.PaymentNotFoundException
 import com.example.saga.payment.application.exception.PaymentRejectedException
 import com.example.saga.payment.application.exception.PaymentRejectionReason
+import com.example.saga.payment.application.port.out.AuditTrail
 import com.example.saga.payment.application.port.out.OrderPaymentCancellationRepository
 import com.example.saga.payment.application.port.out.PaymentIdGenerator
 import com.example.saga.payment.application.port.out.PaymentRepository
-import com.example.saga.payment.domain.Payment
-import com.example.saga.payment.domain.vo.OrderId
-import com.example.saga.payment.domain.vo.PaymentAmount
-import com.example.saga.payment.domain.vo.PaymentId
-import com.example.saga.payment.domain.vo.PaymentStatus
+import com.example.saga.payment.domain.payment.Payment
+import com.example.saga.payment.domain.payment.vo.OrderReferenceId
+import com.example.saga.payment.domain.payment.vo.PaymentAmount
+import com.example.saga.payment.domain.payment.vo.PaymentId
+import com.example.saga.payment.domain.payment.vo.PaymentStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -20,17 +21,18 @@ class PaymentStepExecutor(
     private val orderPaymentCancellationRepository: OrderPaymentCancellationRepository,
     private val paymentIdGenerator: PaymentIdGenerator,
     private val paymentRepository: PaymentRepository,
+    private val auditTrail: AuditTrail,
 ) {
 
     @Transactional
-    fun register(orderId: OrderId, amount: PaymentAmount): Payment {
+    fun register(orderId: OrderReferenceId, amount: PaymentAmount): Payment {
 
         if (orderPaymentCancellationRepository.existsForUpdate(orderId)) {
             throw PaymentRejectedException(orderId.toString(), PaymentRejectionReason.ORDER_CANCELLED)
         }
 
         val existing = paymentRepository.findByOrderId(orderId)
-            ?: return paymentRepository.save(Payment.register(paymentIdGenerator.generate(), orderId, amount))
+            ?: return record(Payment.register(paymentIdGenerator.generate(), orderId, amount), "PAYMENT_REGISTERED")
         return when (existing.status) {
             PaymentStatus.COMPLETED -> existing
             PaymentStatus.PENDING -> throw PaymentAlreadyExistsException(orderId.toString())
@@ -43,20 +45,24 @@ class PaymentStepExecutor(
     fun settle(paymentId: PaymentId, approved: Boolean): Payment {
         val payment = paymentRepository.findByIdForUpdate(paymentId) ?: throw PaymentNotFoundException(paymentId.toString())
         if (payment.status != PaymentStatus.PENDING) return payment
-        return paymentRepository.save(if (approved) payment.approve() else payment.reject())
+        return record(if (approved) payment.approve() else payment.reject(), "PAYMENT_SETTLED")
     }
 
     @Transactional
-    fun cancel(orderId: OrderId): Payment? {
+    fun cancel(orderId: OrderReferenceId): Payment? {
 
         orderPaymentCancellationRepository.saveIfAbsent(orderId)
+        auditTrail.record(orderId.toString(), "PAYMENT_CANCEL_REQUESTED")
 
         val payment = paymentRepository.findByOrderIdForUpdate(orderId) ?: return null
         return when (payment.status) {
-            PaymentStatus.PENDING, PaymentStatus.COMPLETED -> paymentRepository.save(payment.cancel())
+            PaymentStatus.PENDING, PaymentStatus.COMPLETED -> record(payment.cancel(), "PAYMENT_CANCELLED")
 
             PaymentStatus.CANCELLED -> payment
             PaymentStatus.REJECTED -> null
         }
+    }
+    private fun record(payment: Payment, action: String): Payment = paymentRepository.save(payment).also {
+        auditTrail.record(payment.id.toString(), action, payment.status.name)
     }
 }

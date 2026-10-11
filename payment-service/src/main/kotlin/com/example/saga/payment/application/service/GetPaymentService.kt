@@ -1,11 +1,11 @@
 package com.example.saga.payment.application.service
 
 import com.example.saga.payment.application.exception.PaymentNotFoundException
-import com.example.saga.payment.application.port.`in`.query.GetPaymentQuery
-import com.example.saga.payment.application.port.`in`.result.GetPaymentResult
-import com.example.saga.payment.application.port.`in`.usecase.GetPaymentUseCase
+import com.example.saga.payment.application.port.`in`.GetPaymentUseCase
 import com.example.saga.payment.application.port.out.PaymentRepository
-import com.example.saga.payment.domain.vo.PaymentId
+import com.example.saga.payment.application.query.GetPaymentQuery
+import com.example.saga.payment.application.result.GetPaymentResult
+import com.example.saga.payment.domain.payment.vo.PaymentId
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 

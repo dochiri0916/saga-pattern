@@ -1,19 +1,19 @@
 package com.example.saga.payment.application.service
 
 import com.example.saga.payment.adapter.out.identifier.UuidV7PaymentIdGenerator
+import com.example.saga.payment.application.command.CancelOrderPaymentCommand
+import com.example.saga.payment.application.command.PayCommand
 import com.example.saga.payment.application.exception.PaymentAlreadyExistsException
 import com.example.saga.payment.application.exception.PaymentRejectedException
 import com.example.saga.payment.application.exception.PaymentRejectionReason
-import com.example.saga.payment.application.port.`in`.command.CancelOrderPaymentCommand
-import com.example.saga.payment.application.port.`in`.command.PayCommand
 import com.example.saga.payment.application.port.out.OrderPaymentCancellationRepository
 import com.example.saga.payment.application.port.out.PaymentGateway
 import com.example.saga.payment.application.port.out.PaymentRepository
-import com.example.saga.payment.domain.Payment
-import com.example.saga.payment.domain.vo.OrderId
-import com.example.saga.payment.domain.vo.PaymentAmount
-import com.example.saga.payment.domain.vo.PaymentId
-import com.example.saga.payment.domain.vo.PaymentStatus
+import com.example.saga.payment.domain.payment.Payment
+import com.example.saga.payment.domain.payment.vo.OrderReferenceId
+import com.example.saga.payment.domain.payment.vo.PaymentAmount
+import com.example.saga.payment.domain.payment.vo.PaymentId
+import com.example.saga.payment.domain.payment.vo.PaymentStatus
 import com.github.f4b6a3.uuid.UuidCreator
 import java.time.Instant
 import kotlin.test.Test
@@ -25,11 +25,11 @@ class PayServiceTest {
     private val payments = InMemoryPaymentRepository()
     private val cancellations = InMemoryOrderPaymentCancellationRepository()
     private val gateway = FakeGateway()
-    private val executor = PaymentStepExecutor(cancellations, UuidV7PaymentIdGenerator(), payments)
+    private val executor = PaymentStepExecutor(cancellations, UuidV7PaymentIdGenerator(), payments, RecordingAuditTrail())
     private val payService = PayService(executor, gateway)
     private val cancelService = CancelOrderPaymentService(executor, gateway)
 
-    private val orderId = OrderId.of(UuidCreator.getTimeOrderedEpoch())
+    private val orderId = OrderReferenceId.of(UuidCreator.getTimeOrderedEpoch())
 
     private fun pay(amount: Long = 1000) = payService.pay(PayCommand(orderId.value, amount))
 
@@ -162,7 +162,7 @@ private class FakeGateway : PaymentGateway {
     var approvals = 0
     val cancelled = mutableListOf<PaymentId>()
 
-    override fun approve(orderId: OrderId, amount: PaymentAmount): Boolean {
+    override fun approve(orderId: OrderReferenceId, amount: PaymentAmount): Boolean {
         approvals++
         return approve()
     }
@@ -178,17 +178,17 @@ private class InMemoryPaymentRepository : PaymentRepository {
     override fun save(payment: Payment): Payment = payment.also { payments[it.id] = it }
     override fun findById(id: PaymentId): Payment? = payments[id]
     override fun findByIdForUpdate(id: PaymentId): Payment? = payments[id]
-    override fun findByOrderId(orderId: OrderId): Payment? = payments.values.find { it.orderId == orderId }
-    override fun findByOrderIdForUpdate(orderId: OrderId): Payment? = findByOrderId(orderId)
+    override fun findByOrderId(orderId: OrderReferenceId): Payment? = payments.values.find { it.orderId == orderId }
+    override fun findByOrderIdForUpdate(orderId: OrderReferenceId): Payment? = findByOrderId(orderId)
 }
 
 private class InMemoryOrderPaymentCancellationRepository : OrderPaymentCancellationRepository {
-    private val cancelled = HashSet<OrderId>()
+    private val cancelled = HashSet<OrderReferenceId>()
 
-    override fun saveIfAbsent(orderId: OrderId) {
+    override fun saveIfAbsent(orderId: OrderReferenceId) {
         cancelled += orderId
     }
 
-    override fun existsForUpdate(orderId: OrderId): Boolean = orderId in cancelled
+    override fun existsForUpdate(orderId: OrderReferenceId): Boolean = orderId in cancelled
     override fun deleteCancelledBefore(before: Instant, limit: Int): Int = 0
 }

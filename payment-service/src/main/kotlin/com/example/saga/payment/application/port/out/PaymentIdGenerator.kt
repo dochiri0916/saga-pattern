@@ -1,6 +1,6 @@
 package com.example.saga.payment.application.port.out
 
-import com.example.saga.payment.domain.vo.PaymentId
+import com.example.saga.payment.domain.payment.vo.PaymentId
 
 interface PaymentIdGenerator {
 

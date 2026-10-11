@@ -1,19 +1,19 @@
 package com.example.saga.payment
 
+import com.example.saga.payment.application.command.CancelOrderPaymentCommand
+import com.example.saga.payment.application.command.PayCommand
 import com.example.saga.payment.application.exception.PaymentRejectedException
-import com.example.saga.payment.application.port.`in`.command.CancelOrderPaymentCommand
-import com.example.saga.payment.application.port.`in`.command.PayCommand
-import com.example.saga.payment.application.port.`in`.usecase.CancelOrderPaymentUseCase
-import com.example.saga.payment.application.port.`in`.usecase.PayUseCase
+import com.example.saga.payment.application.port.`in`.CancelOrderPaymentUseCase
+import com.example.saga.payment.application.port.`in`.PayUseCase
 import com.example.saga.payment.application.port.out.PaymentRepository
-import com.example.saga.payment.domain.vo.OrderId
-import com.example.saga.payment.domain.vo.PaymentStatus
+import com.example.saga.payment.domain.payment.vo.OrderReferenceId
+import com.example.saga.payment.domain.payment.vo.PaymentStatus
 import com.github.f4b6a3.uuid.UuidCreator
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
 
 @SpringBootTest(classes = [PaymentIntegrationTestConfig::class], properties = [MYSQL_URL, CREATE_TABLES, POOL_SIZE, NO_OUTBOX, NO_CONSUMER])
 class PaymentLockingIntegrationTest @Autowired constructor(
@@ -36,10 +36,10 @@ class PaymentLockingIntegrationTest @Autowired constructor(
             cancel.getOrThrow()
 
             pay.exceptionOrNull()?.let { assertTrue(it is PaymentRejectedException, "예상하지 못한 실패: $it") }
-            val status = paymentRepository.findByOrderId(OrderId.of(orderId))?.status
+            val status = paymentRepository.findByOrderId(OrderReferenceId.of(orderId))?.status
             assertTrue(status == null || status == PaymentStatus.CANCELLED, "취소된 주문의 결제가 $status 상태로 남았다")
 
-            if (OrderId.of(orderId) in gateway.approved) assertTrue(OrderId.of(orderId) in gateway.cancelled, "승인된 결제가 결제사에 취소되지 않았다")
+            if (OrderReferenceId.of(orderId) in gateway.approved) assertTrue(OrderReferenceId.of(orderId) in gateway.cancelled, "승인된 결제가 결제사에 취소되지 않았다")
         }
     }
 
@@ -51,7 +51,7 @@ class PaymentLockingIntegrationTest @Autowired constructor(
         val results = race(*Array(8) { { cancelOrderPaymentUseCase.cancel(CancelOrderPaymentCommand(orderId)) } })
 
         results.forEach { it.getOrThrow() }
-        assertEquals(PaymentStatus.CANCELLED, paymentRepository.findByOrderId(OrderId.of(orderId))?.status)
+        assertEquals(PaymentStatus.CANCELLED, paymentRepository.findByOrderId(OrderReferenceId.of(orderId))?.status)
     }
 
     @Test
@@ -62,6 +62,6 @@ class PaymentLockingIntegrationTest @Autowired constructor(
 
         val paymentIds = results.mapNotNull { it.getOrNull()?.paymentId }.toSet()
         assertEquals(1, paymentIds.size, "성공한 요청은 모두 같은 결제를 돌려줘야 한다")
-        assertEquals(PaymentStatus.COMPLETED, paymentRepository.findByOrderId(OrderId.of(orderId))?.status)
+        assertEquals(PaymentStatus.COMPLETED, paymentRepository.findByOrderId(OrderReferenceId.of(orderId))?.status)
     }
 }
