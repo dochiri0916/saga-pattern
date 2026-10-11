@@ -1,0 +1,10 @@
+com.example.saga.infrastructure.config.ClockConfig
+com.example.saga.infrastructure.config.WebConfig
+com.example.saga.infrastructure.messaging.outbox.OutboxConfig
+com.example.saga.infrastructure.messaging.kafka.KafkaConsumerConfig
+com.example.saga.infrastructure.messaging.inbox.InboxConfig
+com.example.saga.infrastructure.config.JacksonConfig
+com.example.saga.infrastructure.config.IdempotencyConfig
+com.example.saga.infrastructure.messaging.kafka.KafkaProducerConfig
+com.example.saga.infrastructure.config.JpaConfig
+com.example.saga.infrastructure.config.TransactionConfig

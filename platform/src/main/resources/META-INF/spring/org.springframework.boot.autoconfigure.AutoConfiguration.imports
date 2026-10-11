@@ -1,5 +1,0 @@
-com.example.saga.platform.web.PlatformClockAutoConfiguration
-com.example.saga.platform.web.PlatformWebAutoConfiguration
-com.example.saga.platform.outbox.PlatformOutboxAutoConfiguration
-com.example.saga.platform.consumer.PlatformConsumerAutoConfiguration
-com.example.saga.platform.idempotency.PlatformProcessedEventAutoConfiguration

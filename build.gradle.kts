@@ -31,15 +31,17 @@ subprojects {
     }
 
     dependencies {
-        add("implementation", "org.springframework.boot:spring-boot-starter-webmvc")
-        add("implementation", "org.springframework.boot:spring-boot-starter-kafka")
-        add("implementation", "org.springframework.boot:spring-boot-starter-actuator")
-        add("implementation", "org.springframework.boot:spring-boot-starter-jdbc")
-        add("implementation", "org.springframework.boot:spring-boot-starter-data-jpa")
-        add("implementation", "org.jetbrains.kotlin:kotlin-reflect")
-        add("implementation", "tools.jackson.module:jackson-module-kotlin")
-        add("implementation", "com.github.f4b6a3:uuid-creator:6.1.0")
-        add("runtimeOnly", "com.mysql:mysql-connector-j")
+        if (!project.name.endsWith("-contract")) {
+            add("implementation", "org.springframework.boot:spring-boot-starter-webmvc")
+            add("implementation", "org.springframework.boot:spring-boot-starter-kafka")
+            add("implementation", "org.springframework.boot:spring-boot-starter-actuator")
+            add("implementation", "org.springframework.boot:spring-boot-starter-jdbc")
+            add("implementation", "org.springframework.boot:spring-boot-starter-data-jpa")
+            add("implementation", "org.jetbrains.kotlin:kotlin-reflect")
+            add("implementation", "tools.jackson.module:jackson-module-kotlin")
+            add("implementation", "com.github.f4b6a3:uuid-creator:6.1.0")
+            add("runtimeOnly", "com.mysql:mysql-connector-j")
+        }
 
         add("testImplementation", "org.jetbrains.kotlin:kotlin-test-junit5")
         add("testRuntimeOnly", "org.junit.jupiter:junit-jupiter-engine")
@@ -57,7 +59,7 @@ subprojects {
         useJUnitPlatform()
     }
 
-    if (name !in listOf("platform", "architecture-test")) {
+    if (name.endsWith("-service") || name == "infrastructure") {
         val sourceSets = extensions.getByType<SourceSetContainer>()
         val integrationTest = sourceSets.create("integrationTest") {
             compileClasspath += sourceSets["main"].output
@@ -81,15 +83,16 @@ subprojects {
     }
 
     tasks.named<Jar>("jar") {
-        enabled = false
+        enabled = project.name.endsWith("-contract")
     }
 
     tasks.named<BootJar>("bootJar") {
         archiveFileName.set("app.jar")
+        enabled = !project.name.endsWith("-contract")
     }
 }
 
-project(":platform") {
+project(":infrastructure") {
     tasks.named<BootJar>("bootJar") {
         enabled = false
     }
