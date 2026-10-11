@@ -1,6 +1,6 @@
 package com.example.saga.order.application.readmodel
 
-import com.example.saga.order.domain.vo.StockReferenceId
+import com.example.saga.order.domain.order.vo.StockReferenceId
 
 data class StockSnapshot(
     val stockReferenceId: StockReferenceId,

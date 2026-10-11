@@ -1,11 +1,11 @@
 package com.example.saga.order.application.service
 
 import com.example.saga.order.application.exception.OrderNotFoundException
-import com.example.saga.order.application.port.`in`.query.GetOrderQuery
-import com.example.saga.order.application.port.`in`.result.GetOrderResult
-import com.example.saga.order.application.port.`in`.usecase.GetOrderUseCase
+import com.example.saga.order.application.port.`in`.GetOrderUseCase
 import com.example.saga.order.application.port.out.OrderRepository
-import com.example.saga.order.domain.vo.OrderId
+import com.example.saga.order.application.query.GetOrderQuery
+import com.example.saga.order.application.result.GetOrderResult
+import com.example.saga.order.domain.order.vo.OrderId
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 

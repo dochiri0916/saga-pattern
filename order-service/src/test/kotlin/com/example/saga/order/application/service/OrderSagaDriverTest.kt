@@ -1,20 +1,22 @@
 package com.example.saga.order.application.service
 
-import com.example.saga.order.application.exception.OrderCancelRejectedException
+import com.example.saga.order.application.exception.OrderCancelPeriodExpiredException
 import com.example.saga.order.application.port.out.ParticipantCallException
 import com.example.saga.order.application.port.out.ParticipantUnavailableException
-import com.example.saga.order.application.saga.OrderCancelPolicy
-import com.example.saga.order.application.saga.OrderSaga
-import com.example.saga.order.application.saga.OrderSagaStatus
-import com.example.saga.order.domain.Order
-import com.example.saga.order.domain.OrderItem
-import com.example.saga.order.domain.OrderItems
-import com.example.saga.order.domain.vo.OrderId
-import com.example.saga.order.domain.vo.OrderQuantity
-import com.example.saga.order.domain.vo.OrderItemId
-import com.example.saga.order.domain.vo.OrderStatus
-import com.example.saga.order.domain.vo.StockReferenceId
-import com.example.saga.order.domain.vo.UnitPrice
+import com.example.saga.order.application.saga.model.OrderSaga
+import com.example.saga.order.application.saga.model.OrderSagaStatus
+import com.example.saga.order.application.saga.orchestrator.OrderSagaDriver
+import com.example.saga.order.application.saga.orchestrator.OrderSagaStepExecutor
+import com.example.saga.order.domain.order.Order
+import com.example.saga.order.domain.order.OrderItem
+import com.example.saga.order.domain.order.OrderItems
+import com.example.saga.order.domain.order.policy.OrderCancelPolicy
+import com.example.saga.order.domain.order.vo.OrderId
+import com.example.saga.order.domain.order.vo.OrderItemId
+import com.example.saga.order.domain.order.vo.OrderQuantity
+import com.example.saga.order.domain.order.vo.OrderStatus
+import com.example.saga.order.domain.order.vo.StockReferenceId
+import com.example.saga.order.domain.order.vo.UnitPrice
 import com.github.f4b6a3.uuid.UuidCreator
 import java.time.Duration
 import java.time.Instant
@@ -27,9 +29,9 @@ class OrderSagaDriverTest {
     private val clock = MutableClock(Instant.parse("2026-10-10T00:00:00Z"))
     private val sagas = InMemoryOrderSagaRepository()
     private val orders = InMemoryOrderRepository()
-    private val events = RecordingOrderEventPublisher()
+    private val events = RecordingEventPublicationPort()
     private val participants = FakeParticipants()
-    private val executor = OrderSagaStepExecutor(sagas, orders, InMemoryOrderIdempotencyKeyRepository(), events, OrderCancelPolicy(Duration.ofDays(7)), clock)
+    private val executor = OrderSagaStepExecutor(sagas, orders, events, OrderCancelPolicy(Duration.ofDays(7)), clock, RecordingAuditTrail())
     private val driver = OrderSagaDriver(executor, participants, participants, participants)
 
     private val order = Order.register(
@@ -130,7 +132,7 @@ class OrderSagaDriverTest {
     @Test
     fun `복구 작업은 도중에 멈춘 진행 중 사가를 완료시키지 않고 중단해 되돌린다`() {
         val started = executor.start(order)
-        executor.apply(order.id, started.status, com.example.saga.order.application.saga.OrderSagaReply.STOCK_DECREASED, null)
+        executor.apply(order.id, started.status, com.example.saga.order.application.saga.model.OrderSagaReply.STOCK_DECREASED, null)
         clock.advance(Duration.ofSeconds(11))
 
         val claimed = executor.claimStalled(clock.instant().minusSeconds(10), 100).single()
@@ -209,9 +211,9 @@ class OrderSagaDriverTest {
     @Test
     fun `그 사이 다른 쪽이 사가를 옮겼으면 늦게 온 결과를 반영하지 않는다`() {
         val started = executor.start(order)
-        executor.abort(order.id, com.example.saga.order.application.saga.OrderSagaAbortReason.TIMED_OUT)
+        executor.abort(order.id, com.example.saga.order.application.saga.model.OrderSagaAbortReason.TIMED_OUT)
 
-        val applied = executor.apply(order.id, started.status, com.example.saga.order.application.saga.OrderSagaReply.STOCK_DECREASED, null)
+        val applied = executor.apply(order.id, started.status, com.example.saga.order.application.saga.model.OrderSagaReply.STOCK_DECREASED, null)
 
         assertEquals(null, applied)
         assertEquals(OrderSagaStatus.STOCK_RESTORE_REQUESTED, sagas.sagas.getValue(order.id).status)
@@ -257,9 +259,8 @@ class OrderSagaDriverTest {
         participants.calls.clear()
         clock.advance(Duration.ofDays(7))
 
-        val rejected = assertFailsWith<OrderCancelRejectedException> { cancel() }
+        assertFailsWith<OrderCancelPeriodExpiredException> { cancel() }
 
-        assertEquals("CANCEL_PERIOD_EXPIRED", rejected.reason)
         assertEquals(emptyList(), participants.calls)
         assertEquals(OrderSagaStatus.COMPLETED, sagas.sagas.getValue(order.id).status)
         assertEquals(OrderStatus.COMPLETED, orderStatus())

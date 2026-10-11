@@ -1,0 +1,27 @@
+package com.example.saga.order.adapter.out.persistence
+
+import com.example.saga.order.adapter.out.persistence.mapper.toReadModel
+import com.example.saga.order.adapter.out.persistence.repository.StockSnapshotJpaRepository
+import com.example.saga.order.application.port.out.StockSnapshotRepository
+import com.example.saga.order.application.readmodel.StockSnapshot
+import com.example.saga.order.domain.order.vo.StockReferenceId
+import org.springframework.data.repository.findByIdOrNull
+import org.springframework.stereotype.Repository
+
+@Repository
+class StockSnapshotRepositoryAdapter(
+    private val stockSnapshotJpaRepository: StockSnapshotJpaRepository,
+) : StockSnapshotRepository {
+
+    override fun saveIfNewer(stockSnapshot: StockSnapshot): Boolean = stockSnapshotJpaRepository.upsertIfNewer(
+        stockId = stockSnapshot.stockReferenceId.value,
+        name = stockSnapshot.name,
+        price = stockSnapshot.price,
+        quantity = stockSnapshot.quantity,
+        version = stockSnapshot.version,
+    ) > 0
+
+    override fun findById(stockReferenceId: StockReferenceId): StockSnapshot? =
+        stockSnapshotJpaRepository.findByIdOrNull(stockReferenceId.value)?.toReadModel()
+
+}

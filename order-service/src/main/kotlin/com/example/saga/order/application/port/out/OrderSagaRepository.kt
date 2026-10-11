@@ -1,7 +1,7 @@
 package com.example.saga.order.application.port.out
 
-import com.example.saga.order.application.saga.OrderSaga
-import com.example.saga.order.domain.vo.OrderId
+import com.example.saga.order.application.saga.model.OrderSaga
+import com.example.saga.order.domain.order.vo.OrderId
 import java.time.Instant
 
 interface OrderSagaRepository {

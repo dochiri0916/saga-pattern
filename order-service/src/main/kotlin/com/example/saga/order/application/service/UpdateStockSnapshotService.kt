@@ -1,10 +1,10 @@
 package com.example.saga.order.application.service
 
-import com.example.saga.order.application.port.`in`.command.UpdateStockSnapshotCommand
-import com.example.saga.order.application.port.`in`.usecase.UpdateStockSnapshotUseCase
+import com.example.saga.order.application.command.UpdateStockSnapshotCommand
+import com.example.saga.order.application.port.`in`.UpdateStockSnapshotUseCase
 import com.example.saga.order.application.port.out.StockSnapshotRepository
 import com.example.saga.order.application.readmodel.StockSnapshot
-import com.example.saga.order.domain.vo.StockReferenceId
+import com.example.saga.order.domain.order.vo.StockReferenceId
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

@@ -1,37 +1,34 @@
 package com.example.saga.order
 
-import com.example.saga.order.application.port.`in`.command.PlaceOrderCommand
-import com.example.saga.order.application.port.`in`.command.PlaceOrderItemCommand
-import com.example.saga.order.application.port.`in`.usecase.PlaceOrderUseCase
 import com.example.saga.order.application.port.out.OrderRepository
 import com.example.saga.order.application.port.out.OrderSagaRepository
 import com.example.saga.order.application.port.out.StockSnapshotRepository
 import com.example.saga.order.application.readmodel.StockSnapshot
-import com.example.saga.order.application.saga.OrderSagaReply
-import com.example.saga.order.application.saga.OrderSagaStatus
-import com.example.saga.order.application.service.OrderSagaStepExecutor
-import com.example.saga.order.domain.Order
-import com.example.saga.order.domain.OrderItem
-import com.example.saga.order.domain.OrderItems
-import com.example.saga.order.domain.vo.OrderId
-import com.example.saga.order.domain.vo.OrderQuantity
-import com.example.saga.order.domain.vo.OrderItemId
-import com.example.saga.order.domain.vo.OrderStatus
-import com.example.saga.order.domain.vo.StockReferenceId
-import com.example.saga.order.domain.vo.UnitPrice
+import com.example.saga.order.application.saga.model.OrderSagaReply
+import com.example.saga.order.application.saga.model.OrderSagaStatus
+import com.example.saga.order.application.saga.orchestrator.OrderSagaStepExecutor
+import com.example.saga.order.domain.order.Order
+import com.example.saga.order.domain.order.OrderItem
+import com.example.saga.order.domain.order.OrderItems
+import com.example.saga.order.domain.order.vo.OrderId
+import com.example.saga.order.domain.order.vo.OrderItemId
+import com.example.saga.order.domain.order.vo.OrderQuantity
+import com.example.saga.order.domain.order.vo.OrderStatus
+import com.example.saga.order.domain.order.vo.StockReferenceId
+import com.example.saga.order.domain.order.vo.UnitPrice
 import com.github.f4b6a3.uuid.UuidCreator
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.transaction.support.TransactionTemplate
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.transaction.support.TransactionTemplate
 
 @SpringBootTest(classes = [OrderIntegrationTestConfig::class], properties = [MYSQL_URL, CREATE_TABLES, POOL_SIZE, NO_OUTBOX, NO_CONSUMER])
 class OrderSagaLockingIntegrationTest @Autowired constructor(
-    private val placeOrderUseCase: PlaceOrderUseCase,
+    private val placementHandler: com.example.saga.order.adapter.`in`.web.OrderPlacementHandler,
     private val executor: OrderSagaStepExecutor,
     private val orderRepository: OrderRepository,
     private val orderSagaRepository: OrderSagaRepository,
@@ -50,9 +47,10 @@ class OrderSagaLockingIntegrationTest @Autowired constructor(
     @Test
     fun `같은 멱등 키의 주문 요청이 동시에 와도 주문은 하나만 만들어지고 한 번만 진행된다`() {
         transactionTemplate.executeWithoutResult { stockSnapshotRepository.saveIfNewer(StockSnapshot(stock, "sample", 1000, 10, 1)) }
-        val command = PlaceOrderCommand(listOf(PlaceOrderItemCommand(stock.value, 1)), "key-${UuidCreator.getTimeOrderedEpoch()}")
+        val key = "key-${UuidCreator.getTimeOrderedEpoch()}"
+        val request = com.example.saga.order.adapter.`in`.web.request.PlaceOrderRequest(listOf(com.example.saga.order.adapter.`in`.web.request.PlaceOrderItemRequest(stock.value, 1)))
 
-        val results = race(*Array(8) { { placeOrderUseCase.place(command) } })
+        val results = race(*Array(8) { { placementHandler.place(key, request) } })
 
         val orderIds = results.map { it.getOrThrow().orderId }.toSet()
         assertEquals(1, orderIds.size)

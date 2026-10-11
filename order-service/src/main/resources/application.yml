@@ -67,11 +67,6 @@ order:
       half-open-calls: 3
   cancel:
     allowed-for: ${ORDER_CANCEL_ALLOWED_FOR:7d}
-  idempotency-keys:
-    cleanup:
-      interval: 10m
-      retention: 24h
-      batch-size: 1000
   saga:
     recovery:
       after: 10s
@@ -80,6 +75,18 @@ order:
     stalled-after: 1m
 
 saga:
+  idempotency:
+    enabled: true
+    cleanup:
+      interval: 10m
+      retention: 24h
+      batch-size: 1000
+  inbox:
+    enabled: true
+    cleanup:
+      interval: 10m
+      retention: 8d
+      batch-size: 1000
   outbox:
     enabled: true
     shard-count: 16

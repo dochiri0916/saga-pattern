@@ -1,7 +1,7 @@
 package com.example.saga.order.application.port.out
 
 import com.example.saga.order.application.readmodel.StockSnapshot
-import com.example.saga.order.domain.vo.StockReferenceId
+import com.example.saga.order.domain.order.vo.StockReferenceId
 
 interface StockSnapshotRepository {
 

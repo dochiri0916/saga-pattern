@@ -1,25 +1,28 @@
 package com.example.saga.order
 
+import com.example.saga.order.application.port.out.EventPublicationPort
 import com.example.saga.order.application.port.out.InventoryClient
-import com.example.saga.order.application.port.out.OrderEventPublisher
 import com.example.saga.order.application.port.out.PaymentClient
 import com.example.saga.order.application.port.out.ShippingClient
-import com.example.saga.order.domain.Order
-import com.example.saga.order.domain.vo.OrderId
+import com.example.saga.order.domain.order.Order
+import com.example.saga.order.domain.order.vo.OrderId
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import org.springframework.boot.SpringBootConfiguration
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.ComponentScan
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 
 @SpringBootConfiguration
 @EnableAutoConfiguration
 @ComponentScan(
     basePackages = [
         "com.example.saga.order.application.service",
-        "com.example.saga.order.config",
+        "com.example.saga.order.application.saga.orchestrator",
+        "com.example.saga.order.adapter.in.web",
+        "com.example.saga.order.adapter.out.config",
         "com.example.saga.order.adapter.out.persistence",
+        "com.example.saga.order.adapter.out.audit",
         "com.example.saga.order.adapter.out.identifier",
     ]
 )
@@ -29,8 +32,8 @@ class OrderIntegrationTestConfig {
     fun participants(): StubParticipants = StubParticipants()
 
     @Bean
-    fun orderEventPublisher(): OrderEventPublisher = object : OrderEventPublisher {
-        override fun publish(order: Order) = Unit
+    fun orderEventPublisher(): EventPublicationPort = object : EventPublicationPort {
+        override fun publish(event: com.example.saga.order.contract.event.OrderCompletedEvent) = Unit
     }
 }
 

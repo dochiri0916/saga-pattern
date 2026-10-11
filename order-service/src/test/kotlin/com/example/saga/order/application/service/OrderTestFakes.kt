@@ -1,20 +1,17 @@
 package com.example.saga.order.application.service
 
+import com.example.saga.order.application.port.out.EventPublicationPort
 import com.example.saga.order.application.port.out.InventoryClient
-import com.example.saga.order.application.port.out.OrderEventPublisher
-import com.example.saga.order.application.port.out.OrderIdempotencyKey
-import com.example.saga.order.application.port.out.OrderIdempotencyKeyRepository
 import com.example.saga.order.application.port.out.OrderRepository
 import com.example.saga.order.application.port.out.OrderSagaRepository
 import com.example.saga.order.application.port.out.PaymentClient
 import com.example.saga.order.application.port.out.ShippingClient
 import com.example.saga.order.application.port.out.StockSnapshotRepository
 import com.example.saga.order.application.readmodel.StockSnapshot
-import com.example.saga.order.application.saga.OrderSaga
-import com.example.saga.order.domain.Order
-import com.example.saga.order.domain.event.OrderCompleted
-import com.example.saga.order.domain.vo.OrderId
-import com.example.saga.order.domain.vo.StockReferenceId
+import com.example.saga.order.application.saga.model.OrderSaga
+import com.example.saga.order.domain.order.Order
+import com.example.saga.order.domain.order.vo.OrderId
+import com.example.saga.order.domain.order.vo.StockReferenceId
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -51,11 +48,11 @@ internal class InMemoryOrderRepository : OrderRepository {
     override fun findById(id: OrderId): Order? = orders[id]
 }
 
-internal class RecordingOrderEventPublisher : OrderEventPublisher {
+internal class RecordingEventPublicationPort : EventPublicationPort {
     val completed = mutableListOf<OrderId>()
 
-    override fun publish(order: Order) {
-        if (order.events.any { it is OrderCompleted }) completed += order.id
+    override fun publish(event: com.example.saga.order.contract.event.OrderCompletedEvent) {
+        completed += OrderId.of(java.util.UUID.fromString(event.orderId))
     }
 }
 
@@ -75,22 +72,6 @@ internal class FakeParticipants : InventoryClient, PaymentClient, ShippingClient
 
     private fun record(call: String) {
         calls += call
-    }
-}
-
-internal class InMemoryOrderIdempotencyKeyRepository : OrderIdempotencyKeyRepository {
-    val keys = HashMap<String, Pair<OrderIdempotencyKey, Instant>>()
-    var now: () -> Instant = { Instant.EPOCH }
-
-    override fun saveIfAbsent(idempotencyKey: OrderIdempotencyKey): Boolean =
-        keys.putIfAbsent(idempotencyKey.key, idempotencyKey to now()) == null
-
-    override fun findByKey(key: String): OrderIdempotencyKey? = keys[key]?.first
-
-    override fun deleteCreatedBefore(before: Instant, limit: Int): Int {
-        val targets = keys.filterValues { it.second.isBefore(before) }.keys.take(limit)
-        targets.forEach { keys.remove(it) }
-        return targets.size
     }
 }
 
