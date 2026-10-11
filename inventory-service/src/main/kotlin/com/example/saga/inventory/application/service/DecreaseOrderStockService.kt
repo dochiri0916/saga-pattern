@@ -1,20 +1,22 @@
 package com.example.saga.inventory.application.service
 
+import com.example.saga.inventory.application.command.DecreaseOrderStockCommand
+import com.example.saga.inventory.application.command.OrderStockItemCommand
 import com.example.saga.inventory.application.exception.OrderStockDecreaseRejectedException
-import com.example.saga.inventory.application.port.`in`.command.DecreaseOrderStockCommand
-import com.example.saga.inventory.application.port.`in`.command.OrderStockItemCommand
-import com.example.saga.inventory.application.port.`in`.usecase.DecreaseOrderStockUseCase
+import com.example.saga.inventory.application.integration.mapper.publishStockChanged
+import com.example.saga.inventory.application.port.`in`.DecreaseOrderStockUseCase
+import com.example.saga.inventory.application.port.out.AuditTrail
+import com.example.saga.inventory.application.port.out.EventPublicationPort
 import com.example.saga.inventory.application.port.out.OrderStockRecordRepository
-import com.example.saga.inventory.application.port.out.StockEventPublisher
 import com.example.saga.inventory.application.port.out.StockRepository
-import com.example.saga.inventory.application.saga.OrderStockRecord
-import com.example.saga.inventory.application.saga.OrderStockStatus
-import com.example.saga.inventory.application.saga.StockDecreaseRejectionReason
-import com.example.saga.inventory.domain.Stock
-import com.example.saga.inventory.domain.exception.InsufficientStockException
-import com.example.saga.inventory.domain.exception.InvalidStockAmountException
-import com.example.saga.inventory.domain.vo.OrderId
-import com.example.saga.inventory.domain.vo.StockId
+import com.example.saga.inventory.domain.orderstock.OrderStockRecord
+import com.example.saga.inventory.domain.orderstock.vo.OrderReferenceId
+import com.example.saga.inventory.domain.orderstock.vo.OrderStockStatus
+import com.example.saga.inventory.domain.orderstock.vo.StockDecreaseRejectionReason
+import com.example.saga.inventory.domain.stock.Stock
+import com.example.saga.inventory.domain.stock.exception.InsufficientStockException
+import com.example.saga.inventory.domain.stock.exception.InvalidStockAmountException
+import com.example.saga.inventory.domain.stock.vo.StockId
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -25,25 +27,31 @@ private val log = LoggerFactory.getLogger(DecreaseOrderStockService::class.java)
 class DecreaseOrderStockService(
     private val orderStockRecordRepository: OrderStockRecordRepository,
     private val stockRepository: StockRepository,
-    private val stockEventPublisher: StockEventPublisher,
+    private val stockEventPublisher: EventPublicationPort,
+    private val auditTrail: AuditTrail,
 ) : DecreaseOrderStockUseCase {
 
     @Transactional(noRollbackFor = [OrderStockDecreaseRejectedException::class])
     override fun decrease(command: DecreaseOrderStockCommand) {
-        val orderId = OrderId.of(command.orderId)
+        val orderId = OrderReferenceId.of(command.orderId)
 
         if (!orderStockRecordRepository.saveIfAbsent(OrderStockRecord(orderId, OrderStockStatus.DECREASED))) {
             answerAsRecorded(orderId)
             return
         }
 
-        val rejection = decreaseAll(command.items) ?: return
+        val rejection = decreaseAll(command.items)
+        if (rejection == null) {
+            auditTrail.record(orderId.toString(), "ORDER_STOCK_DECREASED")
+            return
+        }
         orderStockRecordRepository.save(OrderStockRecord(orderId, OrderStockStatus.REJECTED))
+        auditTrail.record(orderId.toString(), "ORDER_STOCK_REJECTED", rejection.reason.name)
         log.info("주문의 재고 차감을 거절했습니다. orderId={}, reason={}, stockId={}", orderId, rejection.reason, rejection.stockId)
         throw OrderStockDecreaseRejectedException(command.orderId.toString(), rejection.reason, rejection.stockId?.toString())
     }
 
-    private fun answerAsRecorded(orderId: OrderId) {
+    private fun answerAsRecorded(orderId: OrderReferenceId) {
 
         val record = checkNotNull(orderStockRecordRepository.findByOrderId(orderId)) {
             "주문별 재고 기록이 사라졌습니다. orderId=$orderId"

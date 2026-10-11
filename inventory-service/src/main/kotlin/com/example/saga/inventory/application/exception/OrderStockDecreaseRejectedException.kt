@@ -1,6 +1,6 @@
 package com.example.saga.inventory.application.exception
 
-import com.example.saga.inventory.application.saga.StockDecreaseRejectionReason
+import com.example.saga.inventory.domain.orderstock.vo.StockDecreaseRejectionReason
 
 class OrderStockDecreaseRejectedException(
     val orderId: String,

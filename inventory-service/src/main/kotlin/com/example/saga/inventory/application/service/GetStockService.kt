@@ -1,11 +1,11 @@
 package com.example.saga.inventory.application.service
 
 import com.example.saga.inventory.application.exception.StockNotFoundException
-import com.example.saga.inventory.application.port.`in`.query.GetStockQuery
-import com.example.saga.inventory.application.port.`in`.result.GetStockResult
-import com.example.saga.inventory.application.port.`in`.usecase.GetStockUseCase
+import com.example.saga.inventory.application.port.`in`.GetStockUseCase
 import com.example.saga.inventory.application.port.out.StockRepository
-import com.example.saga.inventory.domain.vo.StockId
+import com.example.saga.inventory.application.query.GetStockQuery
+import com.example.saga.inventory.application.result.GetStockResult
+import com.example.saga.inventory.domain.stock.vo.StockId
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 

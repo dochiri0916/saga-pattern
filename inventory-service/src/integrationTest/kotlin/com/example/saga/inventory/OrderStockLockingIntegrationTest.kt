@@ -1,27 +1,27 @@
 package com.example.saga.inventory
 
-import com.example.saga.inventory.adapter.out.persistence.OrderStockRecordJpaRepository
+import com.example.saga.inventory.adapter.out.persistence.repository.OrderStockRecordJpaRepository
+import com.example.saga.inventory.application.command.DecreaseOrderStockCommand
+import com.example.saga.inventory.application.command.OrderStockItemCommand
+import com.example.saga.inventory.application.command.RegisterStockCommand
+import com.example.saga.inventory.application.command.RestoreOrderStockCommand
 import com.example.saga.inventory.application.exception.OrderStockDecreaseRejectedException
-import com.example.saga.inventory.application.port.`in`.command.DecreaseOrderStockCommand
-import com.example.saga.inventory.application.port.`in`.command.OrderStockItemCommand
-import com.example.saga.inventory.application.port.`in`.command.RegisterStockCommand
-import com.example.saga.inventory.application.port.`in`.command.RestoreOrderStockCommand
-import com.example.saga.inventory.application.port.`in`.usecase.DecreaseOrderStockUseCase
-import com.example.saga.inventory.application.port.`in`.usecase.RegisterStockUseCase
-import com.example.saga.inventory.application.port.`in`.usecase.RestoreOrderStockUseCase
+import com.example.saga.inventory.application.port.`in`.DecreaseOrderStockUseCase
+import com.example.saga.inventory.application.port.`in`.RegisterStockUseCase
+import com.example.saga.inventory.application.port.`in`.RestoreOrderStockUseCase
 import com.example.saga.inventory.application.port.out.StockRepository
-import com.example.saga.inventory.application.saga.OrderStockStatus
-import com.example.saga.inventory.application.saga.StockDecreaseRejectionReason
-import com.example.saga.inventory.domain.vo.StockId
+import com.example.saga.inventory.domain.orderstock.vo.OrderStockStatus
+import com.example.saga.inventory.domain.orderstock.vo.StockDecreaseRejectionReason
+import com.example.saga.inventory.domain.stock.vo.StockId
 import com.github.f4b6a3.uuid.UuidCreator
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.data.repository.findByIdOrNull
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.data.repository.findByIdOrNull
 
 @SpringBootTest(classes = [InventoryIntegrationTestConfig::class], properties = [MYSQL_URL, CREATE_TABLES, POOL_SIZE, NO_OUTBOX, NO_CONSUMER])
 class OrderStockLockingIntegrationTest @Autowired constructor(

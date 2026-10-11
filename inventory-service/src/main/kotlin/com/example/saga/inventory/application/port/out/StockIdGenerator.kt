@@ -1,6 +1,6 @@
 package com.example.saga.inventory.application.port.out
 
-import com.example.saga.inventory.domain.vo.StockId
+import com.example.saga.inventory.domain.stock.vo.StockId
 
 interface StockIdGenerator {
 

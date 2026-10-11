@@ -1,7 +1,8 @@
 package com.example.saga.inventory.application.port.out
 
-import com.example.saga.inventory.domain.Stock
-import com.example.saga.inventory.domain.vo.StockId
+import com.example.saga.inventory.domain.stock.Stock
+import com.example.saga.inventory.domain.stock.vo.StockId
+import com.example.saga.inventory.domain.stock.vo.StockRevision
 
 interface StockRepository {
 

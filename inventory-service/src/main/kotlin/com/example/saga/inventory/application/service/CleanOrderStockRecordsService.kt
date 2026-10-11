@@ -1,11 +1,11 @@
 package com.example.saga.inventory.application.service
 
-import com.example.saga.inventory.application.port.`in`.command.CleanOrderStockRecordsCommand
-import com.example.saga.inventory.application.port.`in`.usecase.CleanOrderStockRecordsUseCase
+import com.example.saga.inventory.application.command.CleanOrderStockRecordsCommand
+import com.example.saga.inventory.application.port.`in`.CleanOrderStockRecordsUseCase
 import com.example.saga.inventory.application.port.out.OrderStockRecordRepository
-import com.example.saga.inventory.application.saga.OrderStockStatus
-import org.springframework.stereotype.Service
+import com.example.saga.inventory.domain.orderstock.vo.OrderStockStatus
 import java.time.Clock
+import org.springframework.stereotype.Service
 
 @Service
 class CleanOrderStockRecordsService(

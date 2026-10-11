@@ -1,23 +1,23 @@
 package com.example.saga.inventory.application.service
 
+import com.example.saga.inventory.application.command.CleanOrderStockRecordsCommand
+import com.example.saga.inventory.application.command.DecreaseOrderStockCommand
+import com.example.saga.inventory.application.command.OrderStockItemCommand
+import com.example.saga.inventory.application.command.RestoreOrderStockCommand
 import com.example.saga.inventory.application.exception.OrderStockDecreaseRejectedException
-import com.example.saga.inventory.application.port.`in`.command.CleanOrderStockRecordsCommand
-import com.example.saga.inventory.application.port.`in`.command.DecreaseOrderStockCommand
-import com.example.saga.inventory.application.port.`in`.command.OrderStockItemCommand
-import com.example.saga.inventory.application.port.`in`.command.RestoreOrderStockCommand
+import com.example.saga.inventory.application.port.out.EventPublicationPort
 import com.example.saga.inventory.application.port.out.OrderStockRecordRepository
-import com.example.saga.inventory.application.port.out.StockEventPublisher
 import com.example.saga.inventory.application.port.out.StockRepository
-import com.example.saga.inventory.application.port.out.StockRevision
-import com.example.saga.inventory.application.saga.OrderStockRecord
-import com.example.saga.inventory.application.saga.OrderStockStatus
-import com.example.saga.inventory.application.saga.StockDecreaseRejectionReason
-import com.example.saga.inventory.domain.Stock
-import com.example.saga.inventory.domain.vo.OrderId
-import com.example.saga.inventory.domain.vo.StockId
-import com.example.saga.inventory.domain.vo.StockName
-import com.example.saga.inventory.domain.vo.StockPrice
-import com.example.saga.inventory.domain.vo.StockQuantity
+import com.example.saga.inventory.domain.orderstock.OrderStockRecord
+import com.example.saga.inventory.domain.orderstock.vo.OrderReferenceId
+import com.example.saga.inventory.domain.orderstock.vo.OrderStockStatus
+import com.example.saga.inventory.domain.orderstock.vo.StockDecreaseRejectionReason
+import com.example.saga.inventory.domain.stock.Stock
+import com.example.saga.inventory.domain.stock.vo.StockId
+import com.example.saga.inventory.domain.stock.vo.StockName
+import com.example.saga.inventory.domain.stock.vo.StockPrice
+import com.example.saga.inventory.domain.stock.vo.StockQuantity
+import com.example.saga.inventory.domain.stock.vo.StockRevision
 import com.github.f4b6a3.uuid.UuidCreator
 import java.time.Clock
 import java.time.Duration
@@ -38,14 +38,14 @@ class OrderStockServiceTest {
     }
     private val stocks = InMemoryStockRepository()
     private val records = InMemoryOrderStockRecordRepository { now }
-    private val events = RecordingStockEventPublisher()
-    private val decreaseService = DecreaseOrderStockService(records, stocks, events)
-    private val restoreService = RestoreOrderStockService(records, stocks, events)
+    private val events = RecordingEventPublicationPort()
+    private val decreaseService = DecreaseOrderStockService(records, stocks, events, RecordingAuditTrail())
+    private val restoreService = RestoreOrderStockService(records, stocks, events, RecordingAuditTrail())
     private val cleanService = CleanOrderStockRecordsService(records, clock)
 
     private val apple = stocks.register(quantity = 10)
     private val pear = stocks.register(quantity = 1)
-    private val orderId = OrderId.of(UuidCreator.getTimeOrderedEpoch())
+    private val orderId = OrderReferenceId.of(UuidCreator.getTimeOrderedEpoch())
 
     private fun items(vararg items: Pair<StockId, Int>) = items.map { OrderStockItemCommand(it.first.value, it.second) }
 
@@ -142,9 +142,9 @@ class OrderStockServiceTest {
 
     @Test
     fun `기록 정리는 결과가 더 바뀌지 않는 기록을 보관 기간 뒤에 지우고 차감된 채로 남은 기록은 더 오래 둔다`() {
-        val decreased = OrderId.of(UuidCreator.getTimeOrderedEpoch())
-        val restored = OrderId.of(UuidCreator.getTimeOrderedEpoch())
-        val recent = OrderId.of(UuidCreator.getTimeOrderedEpoch())
+        val decreased = OrderReferenceId.of(UuidCreator.getTimeOrderedEpoch())
+        val restored = OrderReferenceId.of(UuidCreator.getTimeOrderedEpoch())
+        val recent = OrderReferenceId.of(UuidCreator.getTimeOrderedEpoch())
         records.saveIfAbsent(OrderStockRecord(decreased, OrderStockStatus.DECREASED))
         records.saveIfAbsent(OrderStockRecord(restored, OrderStockStatus.RESTORED))
         now = now.plus(Duration.ofDays(9))
@@ -164,8 +164,8 @@ class OrderStockServiceTest {
 
     @Test
     fun `기록 정리는 한 번에 정해진 건수까지만 지운다`() {
-        repeat(3) { records.saveIfAbsent(OrderStockRecord(OrderId.of(UuidCreator.getTimeOrderedEpoch()), OrderStockStatus.RESTORED)) }
-        repeat(3) { records.saveIfAbsent(OrderStockRecord(OrderId.of(UuidCreator.getTimeOrderedEpoch()), OrderStockStatus.DECREASED)) }
+        repeat(3) { records.saveIfAbsent(OrderStockRecord(OrderReferenceId.of(UuidCreator.getTimeOrderedEpoch()), OrderStockStatus.RESTORED)) }
+        repeat(3) { records.saveIfAbsent(OrderStockRecord(OrderReferenceId.of(UuidCreator.getTimeOrderedEpoch()), OrderStockStatus.DECREASED)) }
         now = now.plus(Duration.ofDays(31))
         val command = CleanOrderStockRecordsCommand(Duration.ofDays(8), Duration.ofDays(30), 4)
 
@@ -196,9 +196,9 @@ private class InMemoryStockRepository : StockRepository {
 }
 
 private class InMemoryOrderStockRecordRepository(private val now: () -> Instant) : OrderStockRecordRepository {
-    private val records = LinkedHashMap<OrderId, Pair<OrderStockRecord, Instant>>()
+    private val records = LinkedHashMap<OrderReferenceId, Pair<OrderStockRecord, Instant>>()
 
-    fun status(orderId: OrderId): OrderStockStatus? = records[orderId]?.first?.status
+    fun status(orderId: OrderReferenceId): OrderStockStatus? = records[orderId]?.first?.status
 
     override fun saveIfAbsent(record: OrderStockRecord): Boolean {
         if (record.orderId in records) return false
@@ -216,7 +216,7 @@ private class InMemoryOrderStockRecordRepository(private val now: () -> Instant)
         return records.getValue(record.orderId).first
     }
 
-    override fun findByOrderId(orderId: OrderId): OrderStockRecord? = records[orderId]?.first
+    override fun findByOrderId(orderId: OrderReferenceId): OrderStockRecord? = records[orderId]?.first
 
     override fun deleteUpdatedBefore(statuses: List<OrderStockStatus>, before: Instant, limit: Int): Int {
         val targets = records.filterValues { (record, updatedAt) -> record.status in statuses && updatedAt.isBefore(before) }.keys.take(limit)
@@ -225,10 +225,10 @@ private class InMemoryOrderStockRecordRepository(private val now: () -> Instant)
     }
 }
 
-private class RecordingStockEventPublisher : StockEventPublisher {
+private class RecordingEventPublicationPort : EventPublicationPort {
     val changed = mutableListOf<StockId>()
 
-    override fun publishStockChanged(stock: Stock, revision: StockRevision) {
-        changed += stock.id
+    override fun publish(event: com.example.saga.inventory.contract.event.StockChangedEvent) {
+        changed += StockId.of(java.util.UUID.fromString(event.stockId))
     }
 }

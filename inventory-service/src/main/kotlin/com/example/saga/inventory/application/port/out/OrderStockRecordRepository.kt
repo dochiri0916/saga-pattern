@@ -1,8 +1,8 @@
 package com.example.saga.inventory.application.port.out
 
-import com.example.saga.inventory.application.saga.OrderStockRecord
-import com.example.saga.inventory.application.saga.OrderStockStatus
-import com.example.saga.inventory.domain.vo.OrderId
+import com.example.saga.inventory.domain.orderstock.OrderStockRecord
+import com.example.saga.inventory.domain.orderstock.vo.OrderReferenceId
+import com.example.saga.inventory.domain.orderstock.vo.OrderStockStatus
 import java.time.Instant
 
 interface OrderStockRecordRepository {
@@ -13,7 +13,7 @@ interface OrderStockRecordRepository {
 
     fun save(record: OrderStockRecord)
 
-    fun findByOrderId(orderId: OrderId): OrderStockRecord?
+    fun findByOrderId(orderId: OrderReferenceId): OrderStockRecord?
 
     fun deleteUpdatedBefore(statuses: List<OrderStockStatus>, before: Instant, limit: Int): Int
 }

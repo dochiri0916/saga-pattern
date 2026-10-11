@@ -1,13 +1,15 @@
 package com.example.saga.inventory.adapter.`in`.web
 
-import com.example.saga.inventory.domain.exception.InsufficientStockException
-import com.example.saga.inventory.domain.exception.InvalidStockAmountException
-import com.example.saga.inventory.domain.exception.NegativeStockPriceException
-import com.example.saga.inventory.domain.exception.NegativeStockQuantityException
-import com.example.saga.inventory.domain.exception.StockDomainException
-import com.example.saga.inventory.domain.exception.StockNameRequiredException
-import com.example.saga.inventory.domain.exception.StockOverflowException
-import com.example.saga.platform.web.ProblemDetailFactory
+import com.example.saga.infrastructure.web.ProblemDetailFactory
+import com.example.saga.inventory.adapter.`in`.web.controller.OrderStockController
+import com.example.saga.inventory.adapter.`in`.web.controller.StockController
+import com.example.saga.inventory.domain.stock.exception.InsufficientStockException
+import com.example.saga.inventory.domain.stock.exception.InvalidStockAmountException
+import com.example.saga.inventory.domain.stock.exception.NegativeStockPriceException
+import com.example.saga.inventory.domain.stock.exception.NegativeStockQuantityException
+import com.example.saga.inventory.domain.stock.exception.StockDomainException
+import com.example.saga.inventory.domain.stock.exception.StockNameRequiredException
+import com.example.saga.inventory.domain.stock.exception.StockOverflowException
 import org.slf4j.LoggerFactory
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
